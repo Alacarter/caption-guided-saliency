@@ -8,6 +8,7 @@ from os import path, makedirs
 import glob
 from tqdm import tqdm
 import numpy as np
+import scipy
 from six.moves import urllib
 import tensorflow as tf
 from PIL import Image
@@ -199,30 +200,52 @@ def get_superimposed_frame(video_id, frame_filename, saliency_frame, sentence):
     original_image = Image.open(frame_filename).resize((SCALE, SCALE),
                                                         Image.ANTIALIAS)
     n_words = saliency_frame.shape[0]
-    n_frames = n_words + 1
-    
+    n_extra_frames = 3
+    n_frames = n_words + n_extra_frames
+
     w = np.floor(np.sqrt(n_frames))
     h = np.ceil(np.float32(n_frames) / w )
     figw, figh = int(h * 3), int(w * 3)
     f = plt.figure(figsize=(figw, figh), facecolor = "black", dpi = 150)
     
-    for i in range(saliency_frame.shape[0] + 1):
+    saliencies = []
+    for i in range(n_frames):
         word_idx = i - 1
         plt.subplot(w, h, i + 1)
         plt.imshow(original_image)
 
-        if i > 0:
+        if i == n_words + 1:
+            saliency = np.mean(saliencies, axis=0)
+            saliency = saliency * (1.0 / np.max(saliency))
+            plt.imshow(saliency, vmin=0.0, vmax=1.0, alpha = 0.5, cmap="jet")
+        elif i == n_words + 2:
+            # Sum all saliencies in the last frame
+            saliency = np.mean(saliencies, axis=0)
+            # import ipdb; ipdb.set_trace()
+            temp = 0.1
+            saliency = scipy.special.softmax(saliency / temp)
+            # saliency = 0.5 + 0 * saliency
+            saliency = saliency * (1.0 / np.max(saliency)) # normalize roughly to (0, 1) values
+            # import ipdb; ipdb.set_trace()
+            # Seems like [0 is blue on the saliency, and 1 is red]?
+            plt.imshow(saliency, vmin=0.0, vmax=1.0, alpha = 0.5, cmap="jet")
+        elif i > 0:
             saliency = generate_saliency(saliency_frame[word_idx].reshape(8, 8),
                                      (SCALE, SCALE), norm = False)
             saliency = np.asarray(saliency) / 255.
+            saliencies.append(saliency)
             plt.imshow(saliency, vmin=0.0, vmax=1.0, alpha = 0.5, cmap="jet")
         
-        fontsize = 12 + (h - 2) * 2
-
         if i == 0:
             word = "[Orig Image]"
+        elif i == n_words + 1:
+            word = "[Avg Saliencies]"
+        elif i == n_words + 2:
+            word = "[Saliencies (softmax T={})]".format(temp)
         else:
             word = sentence[word_idx]
+
+        fontsize = 12 + (h - 2) * 2
         plt.text(6, 18, word, fontproperties = font0,
                  color = "black", backgroundcolor='white', fontsize=fontsize)
         
@@ -230,7 +253,7 @@ def get_superimposed_frame(video_id, frame_filename, saliency_frame, sentence):
         plt.tick_params(axis='both', left='off', top='off', right='off',
                         bottom='off', labelleft='off', labeltop='off',
                         labelright='off', labelbottom='off')
-    
+
     bezel_thickness = 0.02
     plt.tight_layout(pad = bezel_thickness, w_pad=bezel_thickness, h_pad=bezel_thickness)
     plt.subplots_adjust(hspace = bezel_thickness , # ,
