@@ -19,13 +19,14 @@ import argparse
 from cfg import msr_vtt_cfg, flickr_cfg
 
 
-FLAGS = tf.app.flags.FLAGS
-tf.app.flags.DEFINE_string('model_dir', "./DATA/feature_extractors/InceptionV3/", """Path to classify_image_graph_def.pb""")
+# FLAGS = tf.app.flags.FLAGS
+# tf.app.flags.DEFINE_string('model_dir', "./DATA/feature_extractors/InceptionV3/", """Path to classify_image_graph_def.pb""")
+MODEL_DIR = "./DATA/feature_extractors/InceptionV3/"
 MODEL_URL = 'http://download.tensorflow.org/models/image/imagenet/inception-2015-12-05.tgz'
 
 def maybe_download_and_extract():
     # Download and extract model tar file
-    dest_directory = FLAGS.model_dir
+    dest_directory = MODEL_DIR
     if not path.exists(dest_directory):
         makedirs(dest_directory)
         filename = MODEL_URL.split('/')[-1]
@@ -41,11 +42,11 @@ def maybe_download_and_extract():
 
 def create_graph():
     # Creates a graph from saved GraphDef file and returns a saver
-    if not path.exists(path.join(FLAGS.model_dir, 'classify_image_graph_def.pb')):
-        print "Graph definition " + path.join(FLAGS.model_dir, 'classify_image_graph_def.pb') + " not found"
+    if not path.exists(path.join(MODEL_DIR, 'classify_image_graph_def.pb')):
+        print "Graph definition " + path.join(MODEL_DIR, 'classify_image_graph_def.pb') + " not found"
         return None
     else:
-        with tf.gfile.FastGFile(path.join(FLAGS.model_dir, 'classify_image_graph_def.pb'), 'rb') as f:
+        with tf.gfile.FastGFile(path.join(MODEL_DIR, 'classify_image_graph_def.pb'), 'rb') as f:
             graph_def = tf.GraphDef()
             graph_def.ParseFromString(f.read())
             _ = tf.import_graph_def(graph_def, name='')
@@ -76,6 +77,7 @@ def extract_features_flickr30k(cfg):
             ]))
         if not path.exists(cfg.path_to_descriptors):
             makedirs(cfg.path_to_descriptors)
+
         for image_name in tqdm(dataset):
             image = np.asarray(Image.open(path.join(cfg.path_to_images, image_name)),
                                np.uint8)
@@ -135,10 +137,10 @@ def extract_features_msr_vtt(cfg, video_path, feat_path):
             #cleanup
             shutil.rmtree(dst)
             
-def main(args):
+def main(dataset):
     # Download Inception_V3 model def
     maybe_download_and_extract()
-    if args.dataset == "MSR-VTT":
+    if dataset == "MSR-VTT":
         cfg = msr_vtt_cfg()
         
         print "Frame extraction/feature pooling for TrainValVideo"
@@ -153,7 +155,7 @@ def main(args):
                                  cfg.path_to_test_video,
                                  cfg.path_to_test_descriptors)
         
-    elif args.dataset == "Flickr30k":
+    elif dataset == "Flickr30k":
         cfg = flickr_cfg()
         extract_features_flickr30k(cfg)
     else:
@@ -168,16 +170,17 @@ if __name__ == "__main__":
                      MSR-VTT and Flickr30k datasets'
         )
     
-    parser.add_argument("--dataset", dest='dataset', type=str, required=True,
+    parser.add_argument("--dataset", dest='dataset', type=str, default="Flickr30k",
                         help='Specify the one from {Flickr30k, MSR-VTT}')
     parser.add_argument("--gpu", dest='gpu', type=str, required=False,
                         help='Set CUDA_VISIBLE_DEVICES environment variable, optional')
-    
+
     args = parser.parse_args()
     if args.gpu:
         os.environ['CUDA_VISIBLE_DEVICES'] = args.gpu
     else:
-        os.environ['CUDA_VISIBLE_DEVICES'] = '0'
-    
-    main(args)        
+        pass
+        # os.environ['CUDA_VISIBLE_DEVICES'] = '0'
+
+    main(args.dataset)
     

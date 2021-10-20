@@ -2,18 +2,18 @@ class flickr_cfg():
     def __init__(self):
         self.id = "Flickr30k"
         ############### Global Parameters ##############
-        self.path_to_descriptors = "./DATA/Flickr30k/flickr30k_incp3/"
-        self.path_to_images = "./DATA/Flickr30k/flickr30k-images/"
+        self.path_to_descriptors = "./DATA/Flickr30k/fruitbot_incp3/"
+        self.path_to_images = "/scratch/cluster/albertyu/datasets/202110190345_fruitbot_image_instruction/fruitbot-images" # "./DATA/Flickr30k/fruitbot-images/" # "./DATA/Flickr30k/flickr30k-images/"
         self.descriptor_suffix = "_incp_v3"  
         
         ############### Split parameters ###############
-        self.annotations_path = "./DATA/Flickr30k/results_20130124.token"
+        self.annotations_path = "/scratch/cluster/albertyu/datasets/202110190345_fruitbot_image_instruction/results_20211019.token" # "./DATA/Flickr30k/results_fruitbot.token"# "./DATA/Flickr30k/results_20130124.token"
         #splits are taken from 
-        self.train_file = "./DATA/Flickr30k/imgs_train.txt"
-        self.val_file = "./DATA/Flickr30k/imgs_val.txt"
-        self.test_file = "./DATA/Flickr30k/imgs_test.txt" 
+        self.train_file = "/scratch/cluster/albertyu/datasets/202110190345_fruitbot_image_instruction/20211019_train.txt" # "./DATA/Flickr30k/fruitbot_imgs_train.txt" # "./DATA/Flickr30k/imgs_train.txt"
+        self.val_file = "/scratch/cluster/albertyu/datasets/202110190345_fruitbot_image_instruction/20211019_val.txt"# "./DATA/Flickr30k/fruitbot_imgs_train.txt" # "./DATA/Flickr30k/imgs_val.txt"
+        self.test_file = "/scratch/cluster/albertyu/datasets/202110190345_fruitbot_image_instruction/20211019_test.txt" # "./DATA/Flickr30k/fruitbot_imgs_train.txt" # "./DATA/Flickr30k/imgs_test.txt" 
          
-        self.experiment = "./experiments/flickr30k/"                    # files will be overwritten in the case of multiple runs
+        self.experiment = "./experiments/flickr30k/" # files will be overwritten in the case of multiple runs
         self.vocab_path = self.experiment                    
         self.model_path = self.experiment                     
         self.results_path = self.experiment                  
@@ -23,7 +23,7 @@ class flickr_cfg():
         self.learning_rate = 5e-4
         self.n_epochs = 10
         self.batch_size = 100
-        self.max_to_keep = 40
+        self.max_to_keep = 100
         self.save_every_n_epoch = 0.2       # fractional number allows to save the model multiple times during every epoch
                                             # makes sense since by epoch here we understand all sentences for the training data (5 for each image)
         self.use_hard_cache = False         # instead of relying on system file cache explicitly adds all features to dictionary

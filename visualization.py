@@ -1,6 +1,8 @@
 '''
 Saliency visualization for test video from MSR-VTT dataset
 '''
+import matplotlib
+matplotlib.use('Agg')
 import os
 from os import path, makedirs
 import glob
@@ -23,8 +25,9 @@ from preprocessing import extract_frames
 FLAGS = tf.app.flags.FLAGS
 
 ###############################CONFIG
-data_path = "./DATA/MSR-VTT/"
+data_path = "./DATA/Flickr30k/"# MSR-VTT/"
 #tf.app.flags.DEFINE_string('model_dir', "./DATA/" + "feature_extractors/InceptionV3/", """Path to classify_image_graph_def.pb""")
+MODEL_DIR = "./DATA/" + "feature_extractors/InceptionV3/"
 frames_path = data_path + "test_frames/"
 descriptors_save_path = data_path + "full_descriptors/"
 path_to_save_figures = "./output_samples/"
@@ -37,11 +40,11 @@ def extract_all_features(video_id):
     #using Inception_V3
     def create_graph():
             # Creates a graph from saved GraphDef file and returns a saver
-            if not path.exists(path.join(FLAGS.model_dir, 'classify_image_graph_def.pb')):
-                print("Graph definition " + path.join(FLAGS.model_dir, 'classify_image_graph_def.pb') + " not found")
+            if not path.exists(path.join(MODEL_DIR, 'classify_image_graph_def.pb')):
+                print("Graph definition " + path.join(MODEL_DIR, 'classify_image_graph_def.pb') + " not found")
                 exit(1)
             else:
-                with tf.gfile.FastGFile(path.join(FLAGS.model_dir, 'classify_image_graph_def.pb'), 'rb') as f:
+                with tf.gfile.FastGFile(path.join(MODEL_DIR, 'classify_image_graph_def.pb'), 'rb') as f:
                     graph_def = tf.GraphDef()
                     graph_def.ParseFromString(f.read())
                     _ = tf.import_graph_def(graph_def, name='')
@@ -75,7 +78,7 @@ class Saliency_Generator():
         Creates the model for per frame saliency prediction where all spatial features
         forms a batch with input sequence length 1
         '''
-        ixtoword = pd.Series(np.load(cfg.vocab_path + 'ixtoword.npy').tolist())
+        ixtoword = pd.Series(np.load(cfg.vocab_path + 'ixtoword.npy', allow_pickle=True).tolist())
         wordtoix = pkl.load(open(cfg.vocab_path + 'wordtoix.pkl'))
         
         
@@ -196,22 +199,31 @@ def get_superimposed_frame(video_id, frame_filename, saliency_frame, sentence):
     original_image = Image.open(frame_filename).resize((SCALE, SCALE),
                                                         Image.ANTIALIAS)
     n_words = saliency_frame.shape[0]
+    n_frames = n_words + 1
     
-    w = np.floor(np.sqrt(n_words))
-    h = np.ceil(np.float32(n_words) / w )
+    w = np.floor(np.sqrt(n_frames))
+    h = np.ceil(np.float32(n_frames) / w )
     figw, figh = int(h * 3), int(w * 3)
     f = plt.figure(figsize=(figw, figh), facecolor = "black", dpi = 150)
     
-    for word_idx in range(saliency_frame.shape[0]):
-        plt.subplot(w, h, word_idx+1)    
+    for i in range(saliency_frame.shape[0] + 1):
+        word_idx = i - 1
+        plt.subplot(w, h, i + 1)
         plt.imshow(original_image)
-        saliency = generate_saliency(saliency_frame[word_idx].reshape(8, 8),
+
+        if i > 0:
+            saliency = generate_saliency(saliency_frame[word_idx].reshape(8, 8),
                                      (SCALE, SCALE), norm = False)
-        saliency = np.asarray(saliency) / 255.
-        plt.imshow(saliency, vmin=0.0, vmax=1.0, alpha = 0.5, cmap="jet")
+            saliency = np.asarray(saliency) / 255.
+            plt.imshow(saliency, vmin=0.0, vmax=1.0, alpha = 0.5, cmap="jet")
         
-        fontsize = 12 + (h - 2) * 2 
-        plt.text(6, 18, sentence[word_idx], fontproperties = font0,
+        fontsize = 12 + (h - 2) * 2
+
+        if i == 0:
+            word = "[Orig Image]"
+        else:
+            word = sentence[word_idx]
+        plt.text(6, 18, word, fontproperties = font0,
                  color = "black", backgroundcolor='white', fontsize=fontsize)
         
         plt.axis('off')
@@ -247,12 +259,18 @@ def gaussian_filter_3d(saliency_maps, sigma = None):
     
 def create_video_example(video_id, cfg, checkpoint, input_sentence = "a man is driving a car"):
     #load/extract features
-    existing_file = path.join(descriptors_save_path, video_id + cfg.descriptor_suffix + ".npy")
+    # existing_file = path.join(descriptors_save_path, video_id + cfg.descriptor_suffix + ".npy")
+    existing_file = path.join("/scratch/cluster/albertyu/dev/caption-guided-saliency/DATA/Flickr30k/fruitbot_incp3", video_id + "_incp_v3.npy")
     print "Frame feature extraction..."
     if path.exists(existing_file):
         video_features = np.load(existing_file)
     else:
         video_features = extract_all_features(video_id)
+
+    # convert (8, 8, 2048)
+    video_features = np.expand_dims(video_features, axis=0)
+    num_video_frames = 1
+    video_features = np.concatenate([video_features] * num_video_frames)
     video_features = temporal_feature_smoothing(video_features,
                                                 np.ones(3, dtype=np.float32)/float(3.))
     
@@ -269,7 +287,7 @@ def create_video_example(video_id, cfg, checkpoint, input_sentence = "a man is d
     saliency_maps = gaussian_filter_3d(saliency_maps, sigma = [2, 1, 1])
      
     #perform overlay
-    video_frames = sorted(glob.glob(path.join(frames_path,video_id,'*.jpg')))
+    video_frames = [path.join(cfg.path_to_images, video_id + ".jpg")] * num_video_frames
     assert len(video_frames) == saliency_maps.shape[0]
     if not path.exists(path.join(path_to_save_figures, video_id)):
         makedirs(path.join(path_to_save_figures, video_id))
@@ -301,8 +319,10 @@ def main(args):
     
     elif args.dataset == "Flickr30k":
         #add standard visualization for Flickr30k
-        print "Not implemented"
-        exit(1)
+        # print "Not implemented"
+        cfg = flickr_cfg()
+        create_video_example(args.media_id, cfg, args.checkpoint, args.sentence)
+        # exit(1)
     
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Script to produce visualizations')
