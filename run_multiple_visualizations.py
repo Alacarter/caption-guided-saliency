@@ -2,6 +2,7 @@
 import os
 from cfg import *
 import numpy as np
+import argparse
 
 cfg = flickr_cfg()
 
@@ -26,17 +27,19 @@ with open(cfg.annotations_path, "r") as f:
         if file_id in test_ex:
             file_id_to_annotation_map[file_id] = annotation.rstrip()
 
-gpu = 3
-model_checkpoint = 34
-num_evals = 1
+parser = argparse.ArgumentParser()
+parser.add_argument("--gpu", type=str, required=False)
+parser.add_argument("--checkpoint", type=int, required=True)
+parser.add_argument("--num-evals", type=int, required=True)
+args = parser.parse_args()
 
 np.random.seed(0)
-file_ids_to_eval = np.random.choice(list(file_id_to_annotation_map.keys()), num_evals)
+file_ids_to_eval = np.random.choice(list(file_id_to_annotation_map.keys()), args.num_evals)
 print("file_ids_to_eval", file_ids_to_eval)
 
 for eval_id in file_ids_to_eval:
     caption = file_id_to_annotation_map[eval_id]
-    command = 'python visualization.py --dataset Flickr30k --media_id {}  --checkpoint {} --sentence "{}" --gpu {}'.format(eval_id, model_checkpoint, caption, gpu)
+    command = 'python visualization.py --dataset Flickr30k --media_id {}  --checkpoint {} --sentence "{}" --gpu {}'.format(eval_id, args.checkpoint, caption, args.gpu)
     print(command)
     os.system(command)
 

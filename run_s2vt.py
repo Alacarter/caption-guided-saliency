@@ -413,10 +413,11 @@ if __name__ == '__main__':
                         help='Set CUDA_VISIBLE_DEVICES environment variable, optional')
     
     args = parser.parse_args()
-    if args.gpu:
-        os.environ['CUDA_VISIBLE_DEVICES'] = args.gpu
-    else:
-        os.environ['CUDA_VISIBLE_DEVICES'] = '0'
+    if args.gpu != "slurm":
+        if args.gpu:
+            os.environ['CUDA_VISIBLE_DEVICES'] = args.gpu
+        else:
+            os.environ['CUDA_VISIBLE_DEVICES'] = '0'
     
     if not args.dataset:
         parser.print_help()
